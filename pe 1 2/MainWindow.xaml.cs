@@ -29,6 +29,9 @@ namespace Mastermind
         {
             InitializeComponent();
 
+            // Voeg de Closing handler toe
+            this.Closing += MainWindow_Closing;
+
             // Koppel de pogingenlijst aan de ListBox
             AttemptsListBox.ItemsSource = Attempts;
 
@@ -260,6 +263,38 @@ namespace Mastermind
             DebugTextBox.Visibility = DebugTextBox.Visibility == Visibility.Visible
                 ? Visibility.Collapsed
                 : Visibility.Visible;
+        }
+
+        private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (attempts < MaxAttempts && !CodeGuessed())
+            {
+                // Als het spel niet is afgelopen, vraag dan of de speler wil afsluiten
+                var result = MessageBox.Show("Je hebt het spel nog niet voltooid. Ben je zeker dat je het spel wilt beëindigen?", "Beëindigen", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.No)
+                {
+                    e.Cancel = true; // Annuleer de afsluiting en laat het spel doorgaan
+                }
+                else
+                {
+                    // Als de speler kiest voor Ja, wordt de applicatie afgesloten
+                    Application.Current.Shutdown();
+                }
+            }
+        }
+
+        private bool CodeGuessed()
+        {
+            // Controleer of de code correct is geraden
+            string[] userInput = {
+                ComboBox1.SelectedItem as string,
+                ComboBox2.SelectedItem as string,
+                ComboBox3.SelectedItem as string,
+                ComboBox4.SelectedItem as string
+            };
+
+            return userInput.SequenceEqual(GeneratedCode);
         }
     }
 
