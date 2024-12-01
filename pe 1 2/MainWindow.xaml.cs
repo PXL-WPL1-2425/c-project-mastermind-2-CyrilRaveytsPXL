@@ -13,12 +13,14 @@ namespace Mastermind
         private DispatcherTimer timer;
         private int elapsedTime;
         private const int TimeLimit = 10;
+        private int score;
 
-        
+
+
         private readonly string[] AvailableColors = { "Rood", "Geel", "Oranje", "Wit", "Groen", "Blauw" };
         private string[] GeneratedCode;
         private int attempts;
-        private const int MaxAttempts = 10; // Maximaal aantal pogingen
+        private const int MaxAttempts = 10; 
 
         private readonly ObservableCollection<Attempt> Attempts = new ObservableCollection<Attempt>();
 
@@ -117,19 +119,22 @@ namespace Mastermind
             }
 
             string[] userInput = {
-                ComboBox1.SelectedItem as string,
-                ComboBox2.SelectedItem as string,
-                ComboBox3.SelectedItem as string,
-                ComboBox4.SelectedItem as string
-            };
+        ComboBox1.SelectedItem as string,
+        ComboBox2.SelectedItem as string,
+        ComboBox3.SelectedItem as string,
+        ComboBox4.SelectedItem as string
+    };
 
-            string feedback = GetFeedback(userInput);
+            string feedback = GetFeedback(userInput, out int attemptScore);
 
             Attempts.Add(new Attempt
             {
                 Guess = string.Join(", ", userInput),
                 Feedback = feedback
             });
+
+            score += attemptScore;
+            ScoreLabel.Content = $"Score: {score}";
 
             if (userInput.SequenceEqual(GeneratedCode))
             {
@@ -143,10 +148,12 @@ namespace Mastermind
             StartCountdown();
         }
 
-        private string GetFeedback(string[] userInput)
+
+        private string GetFeedback(string[] userInput, out int attemptScore)
         {
             int correctPosition = 0;
             int correctColor = 0;
+            attemptScore = 0; 
 
             bool[] codeMatched = new bool[GeneratedCode.Length];
             bool[] inputMatched = new bool[userInput.Length];
@@ -178,8 +185,11 @@ namespace Mastermind
                 }
             }
 
+            int wrongColor = userInput.Length - correctPosition - correctColor;
+
             return $"{correctPosition} Rood, {correctColor} Wit";
         }
+
 
         private void ResetComboBoxes()
         {
