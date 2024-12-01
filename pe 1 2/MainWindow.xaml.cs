@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -9,20 +10,26 @@ namespace Mastermind
 {
     public partial class MainWindow : Window
     {
-        // Timer-gerelateerde velden
         private DispatcherTimer timer;
         private int elapsedTime;
         private const int TimeLimit = 10;
 
-        // Spel-logica velden
+        
         private readonly string[] AvailableColors = { "Rood", "Geel", "Oranje", "Wit", "Groen", "Blauw" };
         private string[] GeneratedCode;
         private int attempts;
         private const int MaxAttempts = 10; // Maximaal aantal pogingen
 
+        private readonly ObservableCollection<Attempt> Attempts = new ObservableCollection<Attempt>();
+
         public MainWindow()
         {
             InitializeComponent();
+
+            // Koppel de pogingenlijst aan de ListBox
+            AttemptsListBox.ItemsSource = Attempts;
+
+            // Initialiseer het spel
             InitializeGame();
 
             // Koppel de sneltoets voor debug-mode
@@ -35,37 +42,28 @@ namespace Mastermind
         /// </summary>
         private void InitializeGame()
         {
-            // Genereer een random code
             Random random = new Random();
             GeneratedCode = Enumerable.Range(0, 4)
                                       .Select(_ => AvailableColors[random.Next(AvailableColors.Length)])
                                       .ToArray();
 
-            // Toon de code in debug-mode
             DebugTextBox.Text = string.Join(", ", GeneratedCode);
 
-            // Reset het aantal pogingen
             attempts = 0;
 
-            // Update de venstertitel
+            Attempts.Clear();
+
             UpdateWindowTitle();
 
-            // Reset ComboBoxen
             ResetComboBoxes();
 
-            // Start de timer
             StartCountdown();
         }
 
-        /// <summary>
-        /// Start of reset de countdown-timer voor de huidige beurt.
-        /// </summary>
         private void StartCountdown()
         {
-            // Reset de timer en verstreken tijd
             elapsedTime = 0;
 
-            // Controleer of de timer al bestaat
             if (timer == null)
             {
                 timer = new DispatcherTimer
@@ -75,66 +73,42 @@ namespace Mastermind
                 timer.Tick += Timer_Tick;
             }
 
-            // Start de timer
             timer.Start();
-
-            // Update de timerweergave
             TimerLabel.Content = $"Timer: {elapsedTime}";
         }
 
-        /// <summary>
-        /// Stopt de countdown-timer en voert acties uit als de tijdslimiet is bereikt.
-        /// </summary>
         private void StopCountdown()
         {
-            if (timer != null)
-            {
-                timer.Stop(); // Stop de timer
-            }
-
-            // Actie als de speler de beurt verliest
+            timer?.Stop();
             MessageBox.Show("Tijd is op! Je beurt is verloren.", "Tijdslimiet bereikt", MessageBoxButton.OK, MessageBoxImage.Warning);
 
-            // Verhoog het aantal pogingen
             attempts++;
             UpdateWindowTitle();
 
-            // Controleer of het spel voorbij is
             if (attempts >= MaxAttempts)
             {
                 EndGame();
                 return;
             }
 
-            // Reset UI en start opnieuw
             ResetComboBoxes();
             StartCountdown();
         }
 
-        /// <summary>
-        /// Logica die elke seconde wordt uitgevoerd door de timer.
-        /// </summary>
         private void Timer_Tick(object sender, EventArgs e)
         {
-            // Verhoog de verstreken tijd
             elapsedTime++;
 
-            // Update de timerweergave
             TimerLabel.Content = $"Timer: {elapsedTime}";
 
-            // Controleer of de tijdslimiet is bereikt
             if (elapsedTime >= TimeLimit)
             {
-                StopCountdown(); // Stop de timer en verlies de beurt
+                StopCountdown();
             }
         }
 
-        /// <summary>
-        /// Valideert de ingevoerde code en controleert deze tegen de gegenereerde code.
-        /// </summary>
         private void ValidateButton_Click(object sender, RoutedEventArgs e)
         {
-            // Controleer of het maximum aantal pogingen is bereikt
             if (attempts >= MaxAttempts)
             {
                 MessageBox.Show("Je hebt het maximale aantal pogingen bereikt! Het spel is voorbij.", "Spel voorbij", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -142,7 +116,6 @@ namespace Mastermind
                 return;
             }
 
-            // Valideer de code
             string[] userInput = {
                 ComboBox1.SelectedItem as string,
                 ComboBox2.SelectedItem as string,
@@ -150,7 +123,14 @@ namespace Mastermind
                 ComboBox4.SelectedItem as string
             };
 
-            // Controleer of de invoer overeenkomt met de gegenereerde code
+            string feedback = GetFeedback(userInput);
+
+            Attempts.Add(new Attempt
+            {
+                Guess = string.Join(", ", userInput),
+                Feedback = feedback
+            });
+
             if (userInput.SequenceEqual(GeneratedCode))
             {
                 MessageBox.Show("Gefeliciteerd! Je hebt de code gekraakt!", "Spel gewonnen", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -158,17 +138,64 @@ namespace Mastermind
                 return;
             }
 
-            // Verhoog het aantal pogingen
             attempts++;
             UpdateWindowTitle();
-
-            // Start de timer opnieuw
             StartCountdown();
         }
 
-        /// <summary>
-        /// Schakelt de debug-modus in of uit.
-        /// </summary>
+        private string GetFeedback(string[] userInput)
+        {
+            int correctPosition = 0;
+            int correctColor = 0;
+
+            bool[] codeMatched = new bool[GeneratedCode.Length];
+            bool[] inputMatched = new bool[userInput.Length];
+
+            for (int i = 0; i < GeneratedCode.Length; i++)
+            {
+                if (userInput[i] == GeneratedCode[i])
+                {
+                    correctPosition++;
+                    codeMatched[i] = true;
+                    inputMatched[i] = true;
+                }
+            }
+
+            for (int i = 0; i < userInput.Length; i++)
+            {
+                if (inputMatched[i]) continue;
+
+                for (int j = 0; j < GeneratedCode.Length; j++)
+                {
+                    if (codeMatched[j]) continue;
+
+                    if (userInput[i] == GeneratedCode[j])
+                    {
+                        correctColor++;
+                        codeMatched[j] = true;
+                        break;
+                    }
+                }
+            }
+
+            return $"{correctPosition} Rood, {correctColor} Wit";
+        }
+
+        private void ResetComboBoxes()
+        {
+            ComboBox[] comboBoxes = { ComboBox1, ComboBox2, ComboBox3, ComboBox4 };
+            foreach (var comboBox in comboBoxes)
+            {
+                comboBox.ItemsSource = AvailableColors;
+                comboBox.SelectedIndex = -1;
+            }
+        }
+
+        private void UpdateWindowTitle()
+        {
+            this.Title = $"Mastermind - Poging {attempts + 1}/{MaxAttempts}";
+        }
+
         private void ToggleDebug()
         {
             DebugTextBox.Visibility = DebugTextBox.Visibility == Visibility.Visible
@@ -176,9 +203,6 @@ namespace Mastermind
                 : Visibility.Visible;
         }
 
-        /// <summary>
-        /// Koppelt de sneltoets voor het toggelen van de debug-modus.
-        /// </summary>
         private void MainWindow_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.F12 && Keyboard.IsKeyDown(Key.LeftCtrl))
@@ -187,42 +211,12 @@ namespace Mastermind
             }
         }
 
-        /// <summary>
-        /// Reset alle ComboBoxen naar hun initiële staat.
-        /// </summary>
-        private void ResetComboBoxes()
-        {
-            ComboBox[] comboBoxes = { ComboBox1, ComboBox2, ComboBox3, ComboBox4 };
-            foreach (var comboBox in comboBoxes)
-            {
-                comboBox.ItemsSource = AvailableColors;
-                comboBox.SelectedIndex = -1; // Geen selectie
-            }
-        }
-
-        /// <summary>
-        /// Update de venstertitel met het huidige aantal pogingen.
-        /// </summary>
-        private void UpdateWindowTitle()
-        {
-            this.Title = $"Mastermind - Poging {attempts + 1}/{MaxAttempts}";
-        }
-
-        /// <summary>
-        /// Eindigt het spel en geeft de gebruiker de optie om opnieuw te spelen.
-        /// </summary>
         private void EndGame()
         {
-            // Stop de timer
-            if (timer != null)
-            {
-                timer.Stop();
-            }
+            timer?.Stop();
 
-            // Toon de juiste code aan de speler
             MessageBox.Show($"De juiste code was: {string.Join(", ", GeneratedCode)}", "Spel afgelopen", MessageBoxButton.OK, MessageBoxImage.Information);
 
-            // Vraag of de speler opnieuw wil spelen
             if (MessageBox.Show("Wil je opnieuw spelen?", "Opnieuw spelen", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
             {
                 InitializeGame();
@@ -232,5 +226,11 @@ namespace Mastermind
                 Close();
             }
         }
+    }
+
+    public class Attempt
+    {
+        public string Guess { get; set; }
+        public string Feedback { get; set; }
     }
 }
