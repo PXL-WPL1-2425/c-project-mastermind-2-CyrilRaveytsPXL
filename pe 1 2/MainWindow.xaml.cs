@@ -10,18 +10,19 @@ namespace Mastermind
 {
     public partial class MainWindow : Window
     {
+        // Timer-gerelateerde velden
         private DispatcherTimer timer;
         private int elapsedTime;
         private const int TimeLimit = 10;
-        private int score;
 
-
-
+        // Spel-logica velden
         private readonly string[] AvailableColors = { "Rood", "Geel", "Oranje", "Wit", "Groen", "Blauw" };
         private string[] GeneratedCode;
         private int attempts;
-        private const int MaxAttempts = 10; 
+        private const int MaxAttempts = 10; // Maximaal aantal pogingen
 
+        // Score en pogingenlijst
+        private int score;
         private readonly ObservableCollection<Attempt> Attempts = new ObservableCollection<Attempt>();
 
         public MainWindow()
@@ -44,21 +45,29 @@ namespace Mastermind
         /// </summary>
         private void InitializeGame()
         {
+            // Genereer een random code
             Random random = new Random();
             GeneratedCode = Enumerable.Range(0, 4)
                                       .Select(_ => AvailableColors[random.Next(AvailableColors.Length)])
                                       .ToArray();
 
+            // Toon de code in debug-mode
             DebugTextBox.Text = string.Join(", ", GeneratedCode);
 
+            // Reset het aantal pogingen
             attempts = 0;
+            score = 0;
 
+            // Reset pogingenlijst
             Attempts.Clear();
 
+            // Update de venstertitel
             UpdateWindowTitle();
 
+            // Reset ComboBoxen
             ResetComboBoxes();
 
+            // Start de timer
             StartCountdown();
         }
 
@@ -89,12 +98,13 @@ namespace Mastermind
 
             if (attempts >= MaxAttempts)
             {
-                EndGame();
-                return;
+                EndGame(false);  // Verlies bij 10 pogingen
             }
-
-            ResetComboBoxes();
-            StartCountdown();
+            else
+            {
+                ResetComboBoxes();
+                StartCountdown();
+            }
         }
 
         private void Timer_Tick(object sender, EventArgs e)
@@ -114,32 +124,36 @@ namespace Mastermind
             if (attempts >= MaxAttempts)
             {
                 MessageBox.Show("Je hebt het maximale aantal pogingen bereikt! Het spel is voorbij.", "Spel voorbij", MessageBoxButton.OK, MessageBoxImage.Information);
-                EndGame();
+                EndGame(false); // Verlies bij 10 pogingen
                 return;
             }
 
             string[] userInput = {
-        ComboBox1.SelectedItem as string,
-        ComboBox2.SelectedItem as string,
-        ComboBox3.SelectedItem as string,
-        ComboBox4.SelectedItem as string
-    };
+                ComboBox1.SelectedItem as string,
+                ComboBox2.SelectedItem as string,
+                ComboBox3.SelectedItem as string,
+                ComboBox4.SelectedItem as string
+            };
 
+            // Bereken de feedback en score
             string feedback = GetFeedback(userInput, out int attemptScore);
 
+            // Voeg de poging en feedback toe aan de lijst
             Attempts.Add(new Attempt
             {
                 Guess = string.Join(", ", userInput),
                 Feedback = feedback
             });
 
+            // Update de score
             score += attemptScore;
             ScoreLabel.Content = $"Score: {score}";
 
+            // Controleer of de code correct is
             if (userInput.SequenceEqual(GeneratedCode))
             {
                 MessageBox.Show("Gefeliciteerd! Je hebt de code gekraakt!", "Spel gewonnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                EndGame();
+                EndGame(true);  // Gewonnen
                 return;
             }
 
@@ -148,16 +162,16 @@ namespace Mastermind
             StartCountdown();
         }
 
-
         private string GetFeedback(string[] userInput, out int attemptScore)
         {
             int correctPosition = 0;
             int correctColor = 0;
-            attemptScore = 0; 
+            attemptScore = 0; // Start score per poging
 
             bool[] codeMatched = new bool[GeneratedCode.Length];
             bool[] inputMatched = new bool[userInput.Length];
 
+            // Bereken de juiste posities (0 strafpunten)
             for (int i = 0; i < GeneratedCode.Length; i++)
             {
                 if (userInput[i] == GeneratedCode[i])
@@ -168,6 +182,7 @@ namespace Mastermind
                 }
             }
 
+            // Bereken de juiste kleuren (1 strafpunt)
             for (int i = 0; i < userInput.Length; i++)
             {
                 if (inputMatched[i]) continue;
@@ -185,11 +200,13 @@ namespace Mastermind
                 }
             }
 
+            // Bereken de strafpunten
             int wrongColor = userInput.Length - correctPosition - correctColor;
+            attemptScore = correctPosition * 0 + correctColor * 1 + wrongColor * 2; // 0 strafpunten voor juiste posities, 1 voor kleuren die verkeerd staan, 2 voor kleuren die niet in de code voorkomen
 
+            // Return feedback in een string
             return $"{correctPosition} Rood, {correctColor} Wit";
         }
-
 
         private void ResetComboBoxes()
         {
@@ -206,11 +223,28 @@ namespace Mastermind
             this.Title = $"Mastermind - Poging {attempts + 1}/{MaxAttempts}";
         }
 
-        private void ToggleDebug()
+        private void EndGame(bool won)
         {
-            DebugTextBox.Visibility = DebugTextBox.Visibility == Visibility.Visible
-                ? Visibility.Collapsed
-                : Visibility.Visible;
+            timer?.Stop();
+
+            if (won)
+            {
+                MessageBox.Show("Je hebt de code gekraakt!", "Gefeliciteerd", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                MessageBox.Show($"Je hebt verloren! De code was: {string.Join(", ", GeneratedCode)}", "Spel afgelopen", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+
+            // Vraag of de speler opnieuw wil spelen
+            if (MessageBox.Show("Wil je opnieuw spelen?", "Opnieuw spelen", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            {
+                InitializeGame(); // Begin een nieuwe ronde
+            }
+            else
+            {
+                Close(); // Sluit de applicatie
+            }
         }
 
         private void MainWindow_KeyDown(object sender, KeyEventArgs e)
@@ -221,20 +255,11 @@ namespace Mastermind
             }
         }
 
-        private void EndGame()
+        private void ToggleDebug()
         {
-            timer?.Stop();
-
-            MessageBox.Show($"De juiste code was: {string.Join(", ", GeneratedCode)}", "Spel afgelopen", MessageBoxButton.OK, MessageBoxImage.Information);
-
-            if (MessageBox.Show("Wil je opnieuw spelen?", "Opnieuw spelen", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-            {
-                InitializeGame();
-            }
-            else
-            {
-                Close();
-            }
+            DebugTextBox.Visibility = DebugTextBox.Visibility == Visibility.Visible
+                ? Visibility.Collapsed
+                : Visibility.Visible;
         }
     }
 
